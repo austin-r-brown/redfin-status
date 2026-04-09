@@ -2,7 +2,6 @@
 Thumbs.db
 
 .env
-*.json
 db
 dist
 

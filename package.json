@@ -1,0 +1,19 @@
+{
+  "name": "redfin-status",
+  "version": "0.0.1",
+  "main": "app.ts",
+  "scripts": {
+    "start": "node -e \"require('./dist/app.js').init()\"",
+    "build": "npx tsc"
+  },
+  "dependencies": {
+    "axios": "^1.15.0",
+    "cheerio": "^1.2.0",
+    "dotenv": "^16.3.2",
+    "typescript": "^5.4.3"
+  },
+  "devDependencies": {
+    "@sendinblue/client": "^3.3.1",
+    "@types/node": "^20.11.16"
+  }
+}
