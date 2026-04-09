@@ -1,144 +1,103 @@
 import axios from 'axios';
 import * as cheerio from 'cheerio';
-import { INTERVAL, REDFIN_URL } from './constants/constants';
+import { AXIOS_CONFIG, INTERVAL, REDFIN_URL } from './constants/constants';
 import { DbService } from './services/db.service';
 import { EmailService } from './services/email.service';
-import { ListingInfo, ListingStatus } from './constants/types';
+import { ListingInfo } from './constants/types';
+import { getBodyHtml, getStatusEnum, log } from './constants/helpers';
+import { ConsoleType } from './constants/enums';
 
 class App {
-  private savedListingInfo: ListingInfo | null;
+  private readonly db: DbService;
+  private readonly email: EmailService;
 
-  constructor(
-    private readonly db: DbService,
-    private readonly email: EmailService,
-  ) {
-    this.savedListingInfo = this.db.load();
+  private cachedListingInfo: ListingInfo | null;
+
+  constructor(private readonly url: URL) {
+    this.db = new DbService(url.pathname);
+    this.email = new EmailService();
+    this.cachedListingInfo = this.db.load();
   }
 
-  public run = async (listingInfo: ListingInfo) => {
-    if (JSON.stringify(listingInfo) !== JSON.stringify(this.savedListingInfo)) {
-      this.db.save(listingInfo);
-      const subject = `New Redfin Status: ${listingInfo.status}`;
-      const body = getBodyHtml(listingInfo);
-      this.email.send(subject, [body]);
-    }
-    this.savedListingInfo = listingInfo;
-    this.scheduleNextRun();
-  };
+  public init() {
+    this.checkListingInfo();
+    setInterval(() => this.checkListingInfo(), INTERVAL);
+  }
 
-  private scheduleNextRun() {
-    setTimeout(async () => {
-      const listingInfo = await getListingInfo(REDFIN_URL);
-      if (listingInfo) {
-        this.run(listingInfo);
+  private async checkListingInfo(): Promise<void> {
+    const listingInfo = await this.fetchListingInfo();
+    if (!listingInfo) return;
+
+    if (listingInfo.status !== this.cachedListingInfo?.status) {
+      this.saveListingInfo(listingInfo);
+      this.notifyListingChange(listingInfo);
+    }
+  }
+
+  private saveListingInfo(listingInfo: ListingInfo): void {
+    this.db.save(listingInfo);
+    this.cachedListingInfo = listingInfo;
+  }
+
+  private notifyListingChange(listingInfo: ListingInfo): void {
+    const subject = `New Redfin Status: ${listingInfo.status}`;
+    const body = getBodyHtml(listingInfo, this.url);
+    log(subject);
+    this.email.send(subject, [body]);
+  }
+
+  private async fetchListingInfo(): Promise<ListingInfo> {
+    const listingInfo = { ...this.cachedListingInfo } as ListingInfo;
+    const throwErrors: string[] = [];
+
+    try {
+      const { data: html } = await axios.get(this.url.href, AXIOS_CONFIG);
+      const $ = cheerio.load(html);
+
+      const status = $('.ListingStatusBannerSection').text().trim();
+
+      if (status) listingInfo.status = getStatusEnum(status);
+      else throwErrors.push('Status');
+
+      if (!listingInfo.address) {
+        const address = $('.full-address').text().trim();
+        if (address) listingInfo.address = address;
+        else throwErrors.push('Address');
       }
-    }, INTERVAL);
-  }
-}
 
-function getStatusEnum(input: string): ListingStatus {
-  const status = input
-    .toLowerCase()
-    .split(' ')
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(' ') as ListingStatus;
-
-  const isValid = Object.values(ListingStatus).includes(status);
-  if (!isValid) {
-    console.error(`Invalid Status Found: ${status}`);
-  }
-  return status;
-}
-
-function getBodyHtml({ status, address }: ListingInfo): string {
-  const statusClassMap: Record<ListingStatus, string> = {
-    [ListingStatus.ForSale]: 'status-for-sale',
-    [ListingStatus.Pending]: 'status-pending',
-    [ListingStatus.Sold]: 'status-sold',
-    [ListingStatus.OffMarket]: 'status-off-market',
-    [ListingStatus.PriceDrop]: 'status-price-drop',
-    [ListingStatus.BackOnMarket]: 'status-back-on-market',
-    [ListingStatus.Contingent]: 'status-contingent',
-  };
-
-  const statusClass = statusClassMap[status] || 'status-default';
-
-  return `<div class="container">
-        <div class="card">
-          <div class="header ${statusClass}">
-            Listing Status Update
-          </div>
-          <div class="content">
-            <p>Hello,</p>
-            <p>The status of the following real estate listing has been updated:</p>
-
-            <div class="listing-box">
-              <div class="label"><strong>Address:</strong></div>
-              <div>${address}</div>
-
-              <div class="label" style="margin-top:15px;"><strong>Status:</strong></div>
-              <div>
-                <span class="badge ${statusClass}">
-                  ${status}
-                </span>
-              </div>
-            </div>
-
-            <div class="cta">
-              <a href="${REDFIN_URL}" class="button ${statusClass}">
-                View Listing
-              </a>
-            </div>
-          </div>
-
-          <div class="footer">
-            © ${new Date().getFullYear()}<br/>
-            This is an automated notification.
-          </div>
-
-        </div>
-      </div>`;
-}
-
-async function getListingInfo(url: string): Promise<ListingInfo | null> {
-  try {
-    const { data: html } = await axios.get(url, {
-      headers: {
-        'User-Agent':
-          'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-        Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.9',
-        Connection: 'keep-alive',
-      },
-    });
-
-    const $ = cheerio.load(html);
-
-    const status = $('.ListingStatusBannerSection').text().trim();
-    const address = $('.full-address').text().trim();
-
-    if (!status.length || !address.length) {
-      console.error('Listing Info Missing:', { status, address });
-    } else {
-      console.info(`[${new Date().toLocaleString()}]`);
+      if (throwErrors.length) throw new Error(`Unable to find the following: ${throwErrors.join(', ')}`);
+    } catch (e: any) {
+      log(`Error fetching Redfin listing info from ${this.url.href}: ${e?.message}`, ConsoleType.Error);
     }
 
-    return { status: getStatusEnum(status), address };
-  } catch (err) {
-    console.error('Error fetching or parsing:', err);
+    if (listingInfo.status) {
+      if (listingInfo.address && !this.cachedListingInfo?.address)
+        log(`Successfully fetched address: ${listingInfo.address}`);
+      else log(); // General success indicator
+    }
+
+    return listingInfo;
   }
-  return null;
 }
 
-export const init = async () => {
-  const listingInfo = await getListingInfo(REDFIN_URL);
-  if (listingInfo) {
-    const dbService = new DbService(listingInfo);
-    const emailService = new EmailService();
-    const app = new App(dbService, emailService);
-    app.run(listingInfo);
-  } else {
-    console.log('Failed to init. Retrying in 30 seconds...');
-    setTimeout(() => init(), 30000);
-  }
+const validateUrl = (): URL => {
+  let validUrl: URL | undefined;
+  try {
+    const url = new URL(REDFIN_URL);
+    if (url.host.split('.').includes('redfin')) {
+      validUrl = url;
+    }
+  } catch {}
+
+  if (!validUrl)
+    throw new Error(`Valid Redfin URL must be provided in .env file as REDFIN_URL. 
+      Provided URL: ${REDFIN_URL}`);
+
+  return validUrl;
+};
+
+export const init = (): void => {
+  const url = validateUrl();
+  const app = new App(url);
+  app.init();
 };

@@ -1,5 +1,7 @@
 import { EmailConfig } from '../constants/types';
 import { NETWORK_TIMEOUT } from '../constants/constants';
+import { log } from '../constants/helpers';
+import { ConsoleType } from '../constants/enums';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as SibApiV3Sdk from '@sendinblue/client';
@@ -17,8 +19,9 @@ export class EmailService {
     if (userConfig) {
       this.api.setApiKey(SibApiV3Sdk.TransactionalEmailsApiApiKeys.apiKey, userConfig.apiKey);
     } else {
-      console.warn(
+      log(
         'Valid Email Addresses and API Key must be provided in .env file for emails to be sent. See README.md for more info.',
+        ConsoleType.Warn,
       );
     }
 
@@ -47,17 +50,17 @@ export class EmailService {
       </html>`;
 
     this.api.sendTransacEmail(this.smtpConfig).then(
-      (data) => console.info(`Email sent successfully. ${data.body.messageId}`),
+      (data) => log(`Email sent successfully. ${data.body.messageId}`),
       (err) => this.handleSendError(err, [subject, notifications, footer]),
     );
   }
 
   private async handleSendError(err: any, args: Parameters<EmailService['send']>): Promise<void> {
     const { message } = err?.response?.body ?? {};
-    console.error(`Unable to send email: ${message ? `"${message}"` : JSON.stringify(err)}`);
+    log(`Unable to send email: ${message ? `"${message}"` : JSON.stringify(err)}`, ConsoleType.Error);
 
     if (err?.response?.statusCode !== 401) {
-      console.error(`Retrying in ${NETWORK_TIMEOUT / 1000} seconds...`);
+      log(`Retrying in ${NETWORK_TIMEOUT / 1000} seconds...`, ConsoleType.Error);
       setTimeout(() => this.send(...args), NETWORK_TIMEOUT);
     }
   }
