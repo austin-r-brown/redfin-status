@@ -16,16 +16,12 @@ export function log(message: string = '', type: ConsoleType = ConsoleType.Info) 
   console[type](`${timestamp} ${message}`);
 }
 
-export function getStatusEnum(input: string): ListingStatus {
-  const status = input
-    .toLowerCase()
-    .split(' ')
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(' ') as ListingStatus;
+export function getStatusEnum(str: string): ListingStatus {
+  const status = Object.values(ListingStatus).find((val) => str.toLowerCase().startsWith(val.toLowerCase()));
 
-  const isValid = Object.values(ListingStatus).includes(status);
-  if (!isValid) {
+  if (!status) {
     log(`Invalid Status Found: ${status}`, ConsoleType.Error);
+    return str as ListingStatus;
   }
   return status;
 }
@@ -33,7 +29,8 @@ export function getStatusEnum(input: string): ListingStatus {
 export function getBodyHtml({ status, address }: ListingInfo, url: URL): string {
   const statusClass = STATUS_CLASS_MAP[status] || 'status-default';
 
-  return `<div class="container">
+  return `
+    <div class="container">
       <div class="card">
         <div class="header ${statusClass}">
           Listing Status Update

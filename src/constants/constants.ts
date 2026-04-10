@@ -1,9 +1,6 @@
 require('dotenv').config();
 
-export const MS_IN_DAY: number = 86400000;
 export const MS_IN_MINUTE: number = 60000;
-
-export const LOCALE: string = 'en';
 
 /** Longest amount of time expected for API calls */
 export const NETWORK_TIMEOUT: number = 10000;

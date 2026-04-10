@@ -61,6 +61,7 @@ class App {
 
       if (!listingInfo.address) {
         const address = $('.full-address').text().trim();
+
         if (address) listingInfo.address = address;
         else throwErrors.push('Address');
       }
