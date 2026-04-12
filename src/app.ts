@@ -1,10 +1,10 @@
 import axios from 'axios';
-import * as cheerio from 'cheerio';
+import packageInfo from '../package.json';
 import { AXIOS_CONFIG, INTERVAL, REDFIN_URL } from './constants/constants';
 import { DbService } from './services/db.service';
 import { EmailService } from './services/email.service';
-import { ListingInfo } from './constants/types';
-import { getBodyHtml, getStatusEnum, log } from './constants/helpers';
+import { AxiosData, ListingInfo, RedfinData } from './constants/types';
+import { extractInitialContext, getBodyHtml, getStatusEnum, log, parseRedfinData } from './constants/helpers';
 import { ConsoleType } from './constants/enums';
 
 class App {
@@ -19,9 +19,10 @@ class App {
     this.cachedListingInfo = this.db.load();
   }
 
-  public init() {
-    this.checkListingInfo();
+  public async init() {
+    await this.checkListingInfo();
     setInterval(() => this.checkListingInfo(), INTERVAL);
+    log(`Successfully initialized for address: ${this.cachedListingInfo?.address}`);
   }
 
   private async checkListingInfo(): Promise<void> {
@@ -51,16 +52,17 @@ class App {
     const throwErrors: string[] = [];
 
     try {
-      const { data: html } = await axios.get(this.url.href, AXIOS_CONFIG);
-      const $ = cheerio.load(html);
+      const { data: html }: AxiosData = await axios.get(this.url.href, AXIOS_CONFIG);
+      const initialContext: string = extractInitialContext(html);
+      const { addressSectionInfo }: RedfinData = parseRedfinData(initialContext);
 
-      const status = $('.ListingStatusBannerSection').text().trim();
+      const status = addressSectionInfo.status.displayValue;
 
       if (status) listingInfo.status = getStatusEnum(status);
       else throwErrors.push('Status');
 
       if (!listingInfo.address) {
-        const address = $('.full-address').text().trim();
+        const address = addressSectionInfo.streetAddress.assembledAddress;
 
         if (address) listingInfo.address = address;
         else throwErrors.push('Address');
@@ -72,9 +74,7 @@ class App {
     }
 
     if (listingInfo.status) {
-      if (listingInfo.address && !this.cachedListingInfo?.address)
-        log(`Successfully fetched address: ${listingInfo.address}`);
-      else log(); // General success indicator
+      log(); // General success indicator
     }
 
     return listingInfo;
@@ -98,6 +98,7 @@ const validateUrl = (): URL => {
 };
 
 export const init = (): void => {
+  log(`Starting application v${packageInfo.version}`);
   const url = validateUrl();
   const app = new App(url);
   app.init();

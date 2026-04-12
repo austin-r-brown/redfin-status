@@ -89,10 +89,10 @@ body {
 .status-off-market {
   background-color: #7f8c8d;
 }
-.status-price-drop {
+.status-for-rent {
   background-color: #2980b9;
 }
-.status-back-on-market {
+.status-coming-soon {
   background-color: #8e44ad;
 }
 .status-contingent {
@@ -119,12 +119,12 @@ body {
 .button.status-off-market {
   background-color: #7f8c8d;
 }
-.header.status-price-drop,
-.button.status-price-drop {
+.header.status-for-rent,
+.button.status-for-rent {
   background-color: #2980b9;
 }
-.header.status-back-on-market,
-.button.status-back-on-market {
+.header.status-coming-soon,
+.button.status-coming-soon {
   background-color: #8e44ad;
 }
 .header.status-contingent,

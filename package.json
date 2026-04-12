@@ -3,13 +3,12 @@
   "version": "0.0.2",
   "main": "app.ts",
   "scripts": {
-    "start": "node -e \"require('./dist/app.js').init()\"",
+    "start": "node -e \"require('./dist/src/app.js').init()\"",
     "postinstall": "npm run build",
     "build": "npx tsc"
   },
   "dependencies": {
     "axios": "^1.15.0",
-    "cheerio": "^1.2.0",
     "dotenv": "^16.3.2",
     "typescript": "^5.4.3"
   },
