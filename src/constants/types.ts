@@ -50,9 +50,9 @@ export type RedfinData = {
       unitValue: string;
       addressDisplayLevel: object;
       assembledAddress: string;
-      includeStreetNumber: true;
-      includeUnitNumber: true;
-      includeStreetName: true;
+      includeStreetNumber: boolean;
+      includeUnitNumber: boolean;
+      includeStreetName: boolean;
     };
     latLong: { latitude: number; longitude: number };
     beds: number;
@@ -67,16 +67,16 @@ export type RedfinData = {
     lotSize: number;
     fips: string;
     apn: string;
-    hasOpen: false;
-    hasAgc: false;
-    isRedfin: false;
-    isHot: false;
+    hasOpen: boolean;
+    hasAgc: boolean;
+    isRedfin: boolean;
+    isHot: boolean;
     avmInfo: { displayLevel: number; propertyId: number; predictedValue: number };
     searchStatus: number;
     propertyType: number;
     listingType: number;
-    isMappable: true;
-    userCanShare: true;
+    isMappable: boolean;
+    userCanShare: boolean;
     riftDataSource: string;
     homeStatusLabel: string;
     numFullBaths: number;
@@ -89,18 +89,46 @@ export type RedfinData = {
     rawFullBaths: number;
   };
   mediaBrowserInfo: {
-    photos: [];
-    scans: [];
-    sashes: [];
+    photos: {
+      photoUrls: object;
+      thumbnailData: object;
+      displayLevel: number;
+      dataSourceId: number;
+      photoType: string;
+      subdirectory: string;
+      fileName: string;
+      height: number;
+      width: number;
+      previewIndex: number;
+      photoId: number;
+    }[];
+    scans: {
+      scanId: number;
+      scanUrl: string;
+      scanHost: number;
+      displayLevel: number;
+      isAgentUploaded: boolean;
+    }[];
+    sashes: {
+      sashType: number;
+      sashTypeId: number;
+      sashTypeName: string; // For Sale
+      sashTypeColor: string;
+      isRedfin: boolean;
+      isActiveKeyListing: boolean;
+      openHouseText: string;
+      lastSaleDate: string;
+      lastSalePrice: string;
+    }[];
     videos: [];
-    isHot: false;
+    isHot: boolean;
     streetView: {
-      latLong: object;
+      latLong: { latitude: number; longitude: number };
       streetViewUrl: string;
       displayLevel: number;
       dataSourceId: number;
       staticMapUrl: string;
-      streetViewAvailable: true;
+      streetViewAvailable: boolean;
     };
     altTextForImage: string;
     dataSourceId: number;
