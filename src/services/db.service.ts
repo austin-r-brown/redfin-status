@@ -5,6 +5,7 @@ import { log } from '../constants/helpers';
 import { ConsoleType } from '../constants/enums';
 
 const DB_ROOT_DIR = 'db';
+const FILE_EXTENSION = 'json';
 
 /** Service for saving and restoring persisted data */
 export class DbService {
@@ -12,8 +13,8 @@ export class DbService {
   private readonly filename: string;
 
   constructor(private readonly id: string) {
-    this.filename = this.getSafeFilename(this.id);
-    this.filepath = path.join(DB_ROOT_DIR, `${this.filename}.json`);
+    this.filename = this.generateFilename(this.id);
+    this.filepath = path.join(DB_ROOT_DIR, this.filename);
     this.createFolders();
   }
 
@@ -61,10 +62,12 @@ export class DbService {
     }
   }
 
-  private getSafeFilename = (str: string): string => {
-    return str
+  private generateFilename = (str: string): string => {
+    const safeChars = str
       .replace(/[<>:"/\\|?*\x00-\x1F]/g, '_')
       .replace(/_+/g, '_')
       .replace(/^_+|_+$/g, '');
+
+    return `${safeChars}.${FILE_EXTENSION}`;
   };
 }
