@@ -1,6 +1,6 @@
 {
   "name": "redfin-status",
-  "version": "0.0.2",
+  "version": "1.0.0",
   "main": "app.ts",
   "scripts": {
     "start": "node -e \"require('./dist/src/app.js').init()\"",
