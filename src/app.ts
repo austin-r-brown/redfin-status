@@ -62,9 +62,10 @@ class App {
       else throwErrors.push('Status');
 
       if (!listingInfo.address) {
-        const address = addressSectionInfo.streetAddress.assembledAddress;
+        const { streetAddress, city, state, zip } = addressSectionInfo;
 
-        if (address) listingInfo.address = address;
+        if (streetAddress.assembledAddress)
+          listingInfo.address = `${streetAddress.assembledAddress}, ${city}, ${state} ${zip}`;
         else throwErrors.push('Address');
       }
 
