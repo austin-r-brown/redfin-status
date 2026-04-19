@@ -18,6 +18,7 @@ export type BackupFile = {
 export type ListingInfo = {
   status: ListingStatus;
   address: string;
+  openHouseDate?: string;
 };
 
 export type AxiosData = {

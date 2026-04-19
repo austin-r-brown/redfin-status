@@ -1,5 +1,6 @@
 import { ConsoleType, ListingStatus } from './enums';
 import { ListingInfo, RedfinData } from './types';
+import * as cheerio from 'cheerio';
 
 const STATUS_CLASS_MAP: Record<ListingStatus, string> = {
   [ListingStatus.Active]: 'status-for-sale',
@@ -26,7 +27,18 @@ export function getStatusEnum(str: string): ListingStatus {
   return status;
 }
 
-export function getNotificationHtml({ status, address }: ListingInfo, url: URL): string {
+export function getOpenHouseDate(html: string): string | undefined {
+  const $ = cheerio.load(html);
+
+  const openHouseDate = ['.oh-date', '.oh-time']
+    .map((selector) => $(selector).text().trim())
+    .filter(Boolean)
+    .join('|');
+
+  if (openHouseDate) return openHouseDate;
+}
+
+export function getStatusNotificationHtml({ status, address }: ListingInfo, url: URL): string {
   const statusClass = STATUS_CLASS_MAP[status] || 'status-default';
 
   return `
@@ -49,6 +61,43 @@ export function getNotificationHtml({ status, address }: ListingInfo, url: URL):
                 ${status}
               </span>
             </div>
+          </div>
+
+          <div class="cta">
+            <a href="${url.href}" class="button ${statusClass}">
+              View Listing
+            </a>
+          </div>
+        </div>
+
+        <div class="footer">
+          © ${new Date().getFullYear()}<br/>
+          This is an automated notification.
+        </div>
+
+      </div>
+    </div>`;
+}
+
+export function getOpenHouseNotificationHtml({ openHouseDate, address }: ListingInfo, url: URL): string {
+  const statusClass = STATUS_CLASS_MAP[ListingStatus.Active];
+
+  return `
+    <div class="container">
+      <div class="card">
+        <div class="header ${statusClass}">
+          Open House Update
+        </div>
+        <div class="content">
+          <p>Hello,</p>
+          <p>The open house date of the following real estate listing has been updated:</p>
+
+          <div class="listing-box">
+            <div class="label"><strong>Address:</strong></div>
+            <div>${address}</div>
+
+            <div class="label" style="margin-top:15px;"><strong>Open House Date:</strong></div>
+            <div>${openHouseDate?.replace('|', '<br>')}</div>
           </div>
 
           <div class="cta">

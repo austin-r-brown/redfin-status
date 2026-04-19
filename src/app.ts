@@ -6,10 +6,12 @@ import { EmailService } from './services/email.service';
 import { AxiosData, ListingInfo, RedfinData } from './constants/types';
 import {
   extractRedfinData as extractRedfinDataString,
-  getNotificationHtml,
+  getStatusNotificationHtml,
   getStatusEnum,
   log,
   parseRedfinData,
+  getOpenHouseNotificationHtml,
+  getOpenHouseDate,
 } from './constants/helpers';
 import { ConsoleType, ListingStatus } from './constants/enums';
 
@@ -39,11 +41,19 @@ class App {
   private async checkListingInfo(): Promise<void> {
     const listingInfo = await this.fetchListingInfo();
     if (!listingInfo) return;
+    let saveListingInfo = false;
 
     if (listingInfo.status !== this.cachedListingInfo?.status) {
-      this.saveListingInfo(listingInfo);
-      this.notifyListingChange(listingInfo);
+      saveListingInfo = true;
+      this.notifyStatusChange(listingInfo);
     }
+
+    if (listingInfo.openHouseDate && listingInfo.openHouseDate !== this.cachedListingInfo?.openHouseDate) {
+      saveListingInfo = true;
+      this.notifyOpenHouseChange(listingInfo);
+    }
+
+    if (saveListingInfo) this.saveListingInfo(listingInfo);
   }
 
   private saveListingInfo(listingInfo: ListingInfo): void {
@@ -51,9 +61,17 @@ class App {
     this.cachedListingInfo = listingInfo;
   }
 
-  private notifyListingChange(listingInfo: ListingInfo): void {
-    const subject = `New Redfin Status: ${listingInfo.status}`;
-    const body = getNotificationHtml(listingInfo, this.url);
+  private notifyStatusChange(listingInfo: ListingInfo): void {
+    const subject = `New Listing Status: ${listingInfo.status}`;
+    const body = getStatusNotificationHtml(listingInfo, this.url);
+
+    log(subject);
+    this.email.send(subject, [body]);
+  }
+
+  private notifyOpenHouseChange(listingInfo: ListingInfo): void {
+    const subject = `New Open House: ${listingInfo.openHouseDate?.split('|')[0]}`;
+    const body = getOpenHouseNotificationHtml(listingInfo, this.url);
 
     log(subject);
     this.email.send(subject, [body]);
@@ -61,6 +79,7 @@ class App {
 
   private async fetchListingInfo(): Promise<ListingInfo> {
     let status: ListingStatus | undefined;
+    let openHouseDate: string | undefined;
     let address: string | undefined = this.cachedListingInfo?.address;
 
     try {
@@ -69,6 +88,7 @@ class App {
       const { addressSectionInfo }: RedfinData = parseRedfinData(rawApiData);
 
       status = getStatusEnum(addressSectionInfo.status.displayValue);
+      openHouseDate = getOpenHouseDate(html);
 
       if (!address) {
         const { streetAddress, city, state, zip } = addressSectionInfo;
@@ -84,6 +104,7 @@ class App {
 
     return {
       status: status || this.cachedListingInfo?.status,
+      openHouseDate: openHouseDate || this.cachedListingInfo?.openHouseDate,
       address,
     } as ListingInfo;
   }
