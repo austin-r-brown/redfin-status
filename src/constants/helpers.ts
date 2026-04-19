@@ -26,7 +26,7 @@ export function getStatusEnum(str: string): ListingStatus {
   return status;
 }
 
-export function getBodyHtml({ status, address }: ListingInfo, url: URL): string {
+export function getNotificationHtml({ status, address }: ListingInfo, url: URL): string {
   const statusClass = STATUS_CLASS_MAP[status] || 'status-default';
 
   return `
@@ -67,20 +67,37 @@ export function getBodyHtml({ status, address }: ListingInfo, url: URL): string 
     </div>`;
 }
 
-export function extractInitialContext(input: string): string {
-  const marker = 'InitialContext =';
-  const startIdx = input.indexOf(marker);
+export function extractRedfinData(input: string): string {
+  const marker = '"text":"{}&&';
+  const startAfterMarker = '"\\u002Fstingray\\u002Fapi\\u002Fhome\\u002Fdetails\\u002FaboveTheFold":';
 
-  const braceStart = input.indexOf('{', startIdx);
+  let foundSearchStart = false;
+  let foundMarker = false;
 
   let depth = 0;
+  let startIdx;
   let endIdx = -1;
 
-  for (let i = braceStart; i < input.length; i++) {
+  const isAtIndexOf = (str: string, idx: number) => str === input.slice(idx, idx + str.length);
+
+  for (let i = 0; i < input.length; i++) {
+    if (!foundSearchStart) {
+      foundSearchStart = isAtIndexOf(startAfterMarker, i);
+      if (foundSearchStart) i = i + startAfterMarker.length;
+      else continue;
+    }
+    if (!foundMarker) {
+      foundMarker = isAtIndexOf(marker, i);
+      if (foundMarker) i = i + marker.length;
+      else continue;
+    }
+
     const char = input[i];
 
-    if (char === '{') depth++;
-    else if (char === '}') depth--;
+    if (char === '{') {
+      depth++;
+      if (!startIdx) startIdx = i;
+    } else if (char === '}') depth--;
 
     if (depth === 0) {
       endIdx = i;
@@ -88,19 +105,10 @@ export function extractInitialContext(input: string): string {
     }
   }
 
-  return input.slice(braceStart, endIdx + 1);
+  return input.slice(startIdx, endIdx + 1);
 }
 
-function extractFunctionText(obj: Record<string, any>): string {
-  return obj['ReactServerAgent.cache'].dataCache['/stingray/api/home/details/aboveTheFold'].res.text;
-}
-
-function parseFunctionText(str: string): Record<string, any> {
-  return new Function(`return (${str});`)();
-}
-
-export function parseRedfinData(initialContext: string): RedfinData {
-  const initialContextObj = JSON.parse(initialContext);
-  const functionText = extractFunctionText(initialContextObj);
-  return parseFunctionText(functionText).payload;
+export function parseRedfinData(data: string): RedfinData {
+  const unescaped = JSON.parse(`"${data}"`);
+  return JSON.parse(unescaped).payload;
 }

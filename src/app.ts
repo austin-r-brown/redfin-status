@@ -4,8 +4,14 @@ import { AXIOS_CONFIG, INTERVAL, REDFIN_URL } from './constants/constants';
 import { DbService } from './services/db.service';
 import { EmailService } from './services/email.service';
 import { AxiosData, ListingInfo, RedfinData } from './constants/types';
-import { extractInitialContext, getBodyHtml, getStatusEnum, log, parseRedfinData } from './constants/helpers';
-import { ConsoleType } from './constants/enums';
+import {
+  extractRedfinData as extractRedfinDataString,
+  getNotificationHtml,
+  getStatusEnum,
+  log,
+  parseRedfinData,
+} from './constants/helpers';
+import { ConsoleType, ListingStatus } from './constants/enums';
 
 class App {
   private readonly db: DbService;
@@ -21,7 +27,12 @@ class App {
 
   public async init() {
     await this.checkListingInfo();
-    setInterval(() => this.checkListingInfo(), INTERVAL);
+
+    setInterval(() => {
+      this.checkListingInfo();
+      log(); // Heartbeat
+    }, INTERVAL);
+
     log(`Successfully initialized for address: ${this.cachedListingInfo?.address}`);
   }
 
@@ -42,65 +53,57 @@ class App {
 
   private notifyListingChange(listingInfo: ListingInfo): void {
     const subject = `New Redfin Status: ${listingInfo.status}`;
-    const body = getBodyHtml(listingInfo, this.url);
+    const body = getNotificationHtml(listingInfo, this.url);
+
     log(subject);
     this.email.send(subject, [body]);
   }
 
   private async fetchListingInfo(): Promise<ListingInfo> {
-    const listingInfo = { ...this.cachedListingInfo } as ListingInfo;
-    const throwErrors: string[] = [];
+    let status: ListingStatus | undefined;
+    let address: string | undefined = this.cachedListingInfo?.address;
 
     try {
       const { data: html }: AxiosData = await axios.get(this.url.href, AXIOS_CONFIG);
-      const initialContext: string = extractInitialContext(html);
-      const { addressSectionInfo }: RedfinData = parseRedfinData(initialContext);
+      const rawApiData: string = extractRedfinDataString(html);
+      const { addressSectionInfo }: RedfinData = parseRedfinData(rawApiData);
 
-      const status = addressSectionInfo.status.displayValue;
+      status = getStatusEnum(addressSectionInfo.status.displayValue);
 
-      if (status) listingInfo.status = getStatusEnum(status);
-      else throwErrors.push('Status');
-
-      if (!listingInfo.address) {
+      if (!address) {
         const { streetAddress, city, state, zip } = addressSectionInfo;
-
         if (streetAddress.assembledAddress)
-          listingInfo.address = `${streetAddress.assembledAddress}, ${city}, ${state} ${zip}`;
-        else throwErrors.push('Address');
+          address = `${streetAddress.assembledAddress}, ${city}, ${state} ${zip}`;
       }
-
-      if (throwErrors.length) throw new Error(`Unable to find the following: ${throwErrors.join(', ')}`);
     } catch (e: any) {
       log(`Error fetching Redfin listing info from ${this.url.href}: ${e?.message}`, ConsoleType.Error);
     }
 
-    if (listingInfo.status) {
-      log(); // General success indicator
-    }
+    if (!status) log('Unable to find Status');
+    if (!address) log('Unable to find Address');
 
-    return listingInfo;
+    return {
+      status: status || this.cachedListingInfo?.status,
+      address,
+    } as ListingInfo;
   }
 }
 
-const validateUrl = (): URL => {
+export const init = (): void => {
+  log(`Starting application v${packageInfo.version}`);
+
   let validUrl: URL | undefined;
+
   try {
     const url = new URL(REDFIN_URL);
-    if (url.host.split('.').includes('redfin')) {
-      validUrl = url;
-    }
+    if (url.host.split('.').includes('redfin')) validUrl = url;
   } catch {}
 
   if (!validUrl)
     throw new Error(`Valid Redfin URL must be provided in .env file as REDFIN_URL. 
       Provided URL: ${REDFIN_URL}`);
 
-  return validUrl;
-};
+  const app = new App(validUrl);
 
-export const init = (): void => {
-  log(`Starting application v${packageInfo.version}`);
-  const url = validateUrl();
-  const app = new App(url);
   app.init();
 };

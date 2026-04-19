@@ -12,7 +12,6 @@ export const INTERVAL: number = Math.min(
   720 * MS_IN_MINUTE,
 );
 
-/** Amount of time app is considered timed out after no activity */
 export const REDFIN_URL: string = process.env.REDFIN_URL?.trim() || '';
 
 export const AXIOS_CONFIG = {
