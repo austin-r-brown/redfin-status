@@ -79,8 +79,8 @@ class App {
       log(`Error fetching Redfin listing info from ${this.url.href}: ${e?.message}`, ConsoleType.Error);
     }
 
-    if (!status) log('Unable to find Status');
-    if (!address) log('Unable to find Address');
+    if (!status) log('Unable to find Status', ConsoleType.Error);
+    if (!address) log('Unable to find Address', ConsoleType.Error);
 
     return {
       status: status || this.cachedListingInfo?.status,
