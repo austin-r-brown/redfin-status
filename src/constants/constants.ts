@@ -7,8 +7,8 @@ export const NETWORK_TIMEOUT: number = 10000;
 
 /** Interval at which the app runs */
 export const INTERVAL: number = Math.min(
-  // Default of 5 minutes, minimum of 30 seconds, maximum of 12 hours
-  Math.max((Number(process.env.INTERVAL_MINS) || 5) * MS_IN_MINUTE, NETWORK_TIMEOUT * 3),
+  // Minimum and default of 5 minutes, maximum of 12 hours
+  Math.max(Number(process.env.INTERVAL_MINS) || 5, 5) * MS_IN_MINUTE,
   720 * MS_IN_MINUTE,
 );
 

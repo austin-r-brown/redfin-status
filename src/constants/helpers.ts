@@ -1,5 +1,5 @@
 import { ConsoleType, ListingStatus } from './enums';
-import { ListingInfo, RedfinData } from './types';
+import { ListingInfo, RedfinAddressInfo, RedfinMediaInfo } from './types';
 import * as cheerio from 'cheerio';
 
 const STATUS_CLASS_MAP: Record<ListingStatus, string> = {
@@ -38,7 +38,21 @@ export function getOpenHouseDate(html: string): string | undefined {
   if (openHouseDate) return openHouseDate;
 }
 
-export function getStatusNotificationHtml({ status, address }: ListingInfo, url: URL): string {
+export function getFormattedPrice(amount: number, abbreviated = false): string {
+  if (abbreviated) {
+    if (amount >= 1_000_000) return `$${Number((amount / 1_000_000).toFixed(2))}m`;
+    if (amount >= 1_000) return `$${Number((amount / 1_000).toFixed(1))}k`;
+  }
+
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  }).format(amount);
+}
+
+export function getStatusNotificationHtml({ status, address, link }: ListingInfo): string {
   const statusClass = STATUS_CLASS_MAP[status] || 'status-default';
 
   return `
@@ -64,7 +78,7 @@ export function getStatusNotificationHtml({ status, address }: ListingInfo, url:
           </div>
 
           <div class="cta">
-            <a href="${url.href}" class="button ${statusClass}">
+            <a href="${link}" class="button ${statusClass}">
               View Listing
             </a>
           </div>
@@ -79,13 +93,57 @@ export function getStatusNotificationHtml({ status, address }: ListingInfo, url:
     </div>`;
 }
 
-export function getOpenHouseNotificationHtml({ openHouseDate, address }: ListingInfo, url: URL): string {
-  const statusClass = STATUS_CLASS_MAP[ListingStatus.Active];
-
+export function getPriceNotificationHtml({ price, address, link }: ListingInfo, oldPrice: number): string {
   return `
     <div class="container">
       <div class="card">
-        <div class="header ${statusClass}">
+        <div class="header price-change-new">
+          Listing Price Update
+        </div>
+        <div class="content">
+          <p>Hello,</p>
+          <p>The price of the following real estate listing has been updated:</p>
+
+          <div class="listing-box">
+            <div class="label"><strong>Address:</strong></div>
+            <div>${address}</div>
+
+            <div class="label" style="margin-top:15px;"><strong>Previous Price:</strong></div>
+            <div>
+              <span class="badge price-change-old">
+                <s>${getFormattedPrice(oldPrice)}</s>
+              </span>
+            </div>
+
+            <div class="label" style="margin-top:15px;"><strong>New Price:</strong></div>
+            <div>
+              <span class="badge price-change-new">
+                ${getFormattedPrice(price)}
+              </span>
+            </div>
+          </div>
+
+          <div class="cta">
+            <a href="${link}" class="button price-change-new">
+              View Listing
+            </a>
+          </div>
+        </div>
+
+        <div class="footer">
+          © ${new Date().getFullYear()}<br/>
+          This is an automated notification.
+        </div>
+
+      </div>
+    </div>`;
+}
+
+export function getOpenHouseNotificationHtml({ openHouseDate, address, link }: ListingInfo): string {
+  return `
+    <div class="container">
+      <div class="card">
+        <div class="header open-house-new">
           Open House Update
         </div>
         <div class="content">
@@ -101,7 +159,7 @@ export function getOpenHouseNotificationHtml({ openHouseDate, address }: Listing
           </div>
 
           <div class="cta">
-            <a href="${url.href}" class="button ${statusClass}">
+            <a href="${link}" class="button open-house-new">
               View Listing
             </a>
           </div>
@@ -157,7 +215,12 @@ export function extractRedfinData(input: string): string {
   return input.slice(startIdx, endIdx + 1);
 }
 
-export function parseRedfinData(data: string): RedfinData {
+export function parseRedfinData(data: string): RedfinAddressInfo {
   const unescaped = JSON.parse(`"${data}"`);
-  return JSON.parse(unescaped).payload;
+  const redfinData: {
+    addressSectionInfo: RedfinAddressInfo;
+    mediaBrowserInfo: RedfinMediaInfo; // Currently unused
+  } = JSON.parse(unescaped).payload;
+
+  return redfinData.addressSectionInfo;
 }
