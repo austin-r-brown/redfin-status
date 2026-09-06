@@ -1,17 +1,7 @@
 import { Cheerio } from 'cheerio';
 import { ConsoleType, ListingStatus } from './enums';
 import { ListingInfo } from './types';
-import { SELECTORS } from './constants';
-
-const STATUS_CLASS_MAP: Record<ListingStatus, string> = {
-  [ListingStatus.Forsale]: 'status-for-sale',
-  [ListingStatus.Pending]: 'status-pending',
-  [ListingStatus.Sold]: 'status-sold',
-  [ListingStatus.Forrent]: 'status-for-rent',
-  [ListingStatus.Comingsoon]: 'status-coming-soon',
-  [ListingStatus.Contingent]: 'status-contingent',
-  [ListingStatus.Offmarket]: 'status-off-market',
-};
+import { SELECTORS, STATUS_TO_CSS_CLASS, STATUS_VALUE_MAP } from './constants';
 
 export function log(message: string = '', type: ConsoleType = ConsoleType.Info) {
   const timestamp = `[${new Date().toLocaleString()}]`;
@@ -35,27 +25,23 @@ export function getContentHash(sections: Cheerio<any>[]): number {
 }
 
 export function getStatus(section: Cheerio<any>): ListingStatus | undefined {
-  for (const selector of [SELECTORS.statusMain, SELECTORS.statusRental]) {
-    const statusText = section.find(selector)?.text()?.trim();
+  const text = section.text();
+  const statusEnd = text.indexOf('$');
+  const input = statusEnd !== -1 ? text.slice(0, statusEnd) : text;
 
-    if (statusText) {
-      let enumKey = statusText.replace(/ /g, '') as keyof typeof ListingStatus;
-      let statusEnum = ListingStatus[enumKey];
+  let candidate = '';
 
-      if (!statusEnum) {
-        // Try first word in case of 'Sold On ...' type statuses
-        enumKey = statusText.match(/^\S+/)?.[0] as keyof typeof ListingStatus;
-        statusEnum = ListingStatus[enumKey];
+  for (const word of input.trim().split(/\s+/)) {
+    candidate += candidate ? ` ${word.toLowerCase()}` : word.toLowerCase();
+    const match = STATUS_VALUE_MAP[candidate];
 
-        if (!statusEnum) {
-          log(`Invalid Status Found: ${statusText}`, ConsoleType.Error);
-          return statusText as ListingStatus;
-        }
-      }
-
-      return statusEnum;
+    if (match) {
+      return match;
     }
   }
+
+  log(`Invalid Status Found: ${candidate}`, ConsoleType.Error);
+  return candidate as ListingStatus;
 }
 
 export function getAddress(section: Cheerio<any>): string | undefined {
@@ -96,7 +82,7 @@ export function getAbbreviatedPrice(amount: number): string {
 }
 
 export function getStatusNotificationHtml({ status, address, link }: ListingInfo): string {
-  const statusClass = STATUS_CLASS_MAP[status] || 'status-default';
+  const statusClass = STATUS_TO_CSS_CLASS[status] || 'status-default';
 
   return `
     <div class="container">

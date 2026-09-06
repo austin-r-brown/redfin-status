@@ -1,3 +1,5 @@
+import { ListingStatus } from './enums';
+
 require('dotenv').config();
 
 export const MS_IN_MINUTE: number = 60000;
@@ -14,11 +16,23 @@ export const INTERVAL: number = Math.min(
 
 export const REDFIN_URL: string = process.env.REDFIN_URL?.trim() || '';
 
+export const STATUS_TO_CSS_CLASS: Record<ListingStatus, string> = {
+  [ListingStatus.ForSale]: 'status-for-sale',
+  [ListingStatus.Pending]: 'status-pending',
+  [ListingStatus.Sold]: 'status-sold',
+  [ListingStatus.ForRent]: 'status-for-rent',
+  [ListingStatus.ComingSoon]: 'status-coming-soon',
+  [ListingStatus.Contingent]: 'status-contingent',
+  [ListingStatus.OffMarket]: 'status-off-market',
+};
+
+export const STATUS_VALUE_MAP: Record<string, ListingStatus> = Object.fromEntries(
+  Object.values(ListingStatus).map((value) => [value.toLowerCase(), value]),
+);
+
 export const SELECTORS = {
   mainSection: '.bp-Section--content div',
   openHouseSection: '.open-house-section',
-  statusMain: '.ListingStatusBannerSection',
-  statusRental: '.status-banner',
   address: '.street-address',
   price: '.statsValue.price',
   openHouseDate: '.oh-date',

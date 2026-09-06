@@ -48,16 +48,19 @@ class App {
     const listingInfo = await this.fetchListingInfo();
     if (!listingInfo) return;
 
-    if (this.cachedListingInfo?.status && listingInfo.status !== this.cachedListingInfo.status) {
-      this.notifyStatusChange(listingInfo);
-    }
+    if (this.cachedListingInfo) {
+      // Only notify when there's been a change to previously saved data
+      if (listingInfo.status !== this.cachedListingInfo.status) {
+        this.notifyStatusChange(listingInfo);
+      }
 
-    if (this.cachedListingInfo?.price && listingInfo.price !== this.cachedListingInfo.price) {
-      this.notifyPriceChange(listingInfo, this.cachedListingInfo.price);
-    }
+      if (listingInfo.price !== this.cachedListingInfo.price) {
+        this.notifyPriceChange(listingInfo, this.cachedListingInfo.price);
+      }
 
-    if (listingInfo.openHouseDate !== this.cachedListingInfo?.openHouseDate) {
-      this.notifyOpenHouseChange(listingInfo);
+      if (listingInfo.openHouseDate !== this.cachedListingInfo.openHouseDate) {
+        this.notifyOpenHouseChange(listingInfo);
+      }
     }
 
     this.saveListingInfo(listingInfo);
@@ -117,7 +120,8 @@ class App {
 
       if (mainSection) {
         status = getStatus(mainSection);
-        price = getPrice(mainSection);
+        // Ignore price changes if the listing is Off Market
+        price = status !== ListingStatus.OffMarket ? getPrice(mainSection) : this.cachedListingInfo?.price;
         if (!address) address = getAddress(mainSection);
       }
 
