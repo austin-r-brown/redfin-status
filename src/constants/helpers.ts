@@ -136,14 +136,16 @@ export function getPriceNotificationHtml({ price, address, link }: ListingInfo, 
           <div class="listing-box">
             <div class="label"><strong>Address:</strong></div>
             <div>${address}</div>
-
-            <div class="label" style="margin-top:15px;"><strong>Previous Price:</strong></div>
-            <div>
-              <span class="badge price-change-old">
-                <s>${getFormattedPrice(oldPrice)}</s>
-              </span>
-            </div>
-
+            ${
+              oldPrice
+                ? `<div class="label" style="margin-top:15px;"><strong>Previous Price:</strong></div>
+                <div>
+                  <span class="badge price-change-old">
+                    <s>${getFormattedPrice(oldPrice)}</s>
+                  </span>
+                </div>`
+                : ''
+            }
             <div class="label" style="margin-top:15px;"><strong>New Price:</strong></div>
             <div>
               <span class="badge price-change-new">

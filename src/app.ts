@@ -80,7 +80,10 @@ class App {
   }
 
   private notifyPriceChange(listingInfo: ListingInfo, oldPrice: number): void {
-    const subject = `New Listing Price: ${getAbbreviatedPrice(oldPrice)} → ${getAbbreviatedPrice(listingInfo.price)}`;
+    const priceChange =
+      oldPrice && [oldPrice, listingInfo.price].map((p) => getAbbreviatedPrice(p)).join(' → ');
+
+    const subject = `New Listing Price: ${priceChange || listingInfo.price}`;
     const body = getPriceNotificationHtml(listingInfo, oldPrice);
 
     log(subject);
