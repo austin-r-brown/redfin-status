@@ -1,14 +1,16 @@
+import { Cheerio } from 'cheerio';
 import { ConsoleType, ListingStatus } from './enums';
-import { ListingInfo, RedfinAddressInfo, RedfinMediaInfo } from './types';
-import * as cheerio from 'cheerio';
+import { ListingInfo } from './types';
+import { SELECTORS } from './constants';
 
 const STATUS_CLASS_MAP: Record<ListingStatus, string> = {
-  [ListingStatus.Active]: 'status-for-sale',
-  [ListingStatus.PendingSale]: 'status-pending',
-  [ListingStatus.ClosedSale]: 'status-sold',
-  [ListingStatus.Sold]: 'status-for-rent',
-  [ListingStatus.ComingSoon]: 'status-coming-soon',
-  [ListingStatus.ActiveUnderContract]: 'status-contingent',
+  [ListingStatus.Forsale]: 'status-for-sale',
+  [ListingStatus.Pending]: 'status-pending',
+  [ListingStatus.Sold]: 'status-sold',
+  [ListingStatus.Forrent]: 'status-for-rent',
+  [ListingStatus.Comingsoon]: 'status-coming-soon',
+  [ListingStatus.Contingent]: 'status-contingent',
+  [ListingStatus.Offmarket]: 'status-off-market',
 };
 
 export function log(message: string = '', type: ConsoleType = ConsoleType.Info) {
@@ -16,40 +18,81 @@ export function log(message: string = '', type: ConsoleType = ConsoleType.Info) 
   console[type](`${timestamp} ${message}`);
 }
 
-export function getStatusEnum(str: string): ListingStatus {
-  const enumKey = str.replace(/ /g, '') as keyof typeof ListingStatus;
-  const status = ListingStatus[enumKey];
+export function getContentHash(sections: Cheerio<any>[]): number {
+  const content = sections
+    .map((s) => s?.text()?.trim())
+    .filter(Boolean)
+    .join('');
 
-  if (!status) {
-    log(`Invalid Status Found: ${str}`, ConsoleType.Error);
-    return str as ListingStatus;
+  let hash = 0x811c9dc5;
+
+  for (let i = 0; i < content.length; i++) {
+    hash ^= content.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193);
   }
-  return status;
+
+  return hash >>> 0;
 }
 
-export function getOpenHouseDate(html: string): string | undefined {
-  const $ = cheerio.load(html);
+export function getStatus(section: Cheerio<any>): ListingStatus | undefined {
+  for (const selector of [SELECTORS.statusMain, SELECTORS.statusRental]) {
+    const statusText = section.find(selector)?.text()?.trim();
 
+    if (statusText) {
+      let enumKey = statusText.replace(/ /g, '') as keyof typeof ListingStatus;
+      let statusEnum = ListingStatus[enumKey];
+
+      if (!statusEnum) {
+        // Try first word in case of 'Sold On ...' type statuses
+        enumKey = statusText.match(/^\S+/)?.[0] as keyof typeof ListingStatus;
+        statusEnum = ListingStatus[enumKey];
+
+        if (!statusEnum) {
+          log(`Invalid Status Found: ${statusText}`, ConsoleType.Error);
+          return statusText as ListingStatus;
+        }
+      }
+
+      return statusEnum;
+    }
+  }
+}
+
+export function getAddress(section: Cheerio<any>): string | undefined {
+  const address = section.find(SELECTORS.address)?.text()?.trim();
+
+  if (address) return address;
+}
+
+export function getPrice(section: Cheerio<any>): number | undefined {
+  const priceText = section.find(SELECTORS.price)?.text()?.trim();
+  const numbers = priceText?.match(/\d+/g)?.join('');
+
+  if (numbers) return Number(numbers);
+}
+
+export function getOpenHouseDate(section: Cheerio<any>): string | undefined {
   const openHouseDate = ['.oh-date', '.oh-time']
-    .map((selector) => $(selector).text().trim())
+    .map((selector) => section.find(selector)?.text()?.trim())
     .filter(Boolean)
     .join('|');
 
   if (openHouseDate) return openHouseDate;
 }
 
-export function getFormattedPrice(amount: number, abbreviated = false): string {
-  if (abbreviated) {
-    if (amount >= 1_000_000) return `$${Number((amount / 1_000_000).toFixed(2))}m`;
-    if (amount >= 1_000) return `$${Number((amount / 1_000).toFixed(1))}k`;
-  }
-
+export function getFormattedPrice(amount: number): string {
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: 'USD',
     minimumFractionDigits: 0,
     maximumFractionDigits: 2,
   }).format(amount);
+}
+
+export function getAbbreviatedPrice(amount: number): string {
+  if (amount >= 1_000_000) return `$${Number((amount / 1_000_000).toFixed(2))}m`;
+  if (amount >= 1_000) return `$${Number((amount / 1_000).toFixed(1))}k`;
+  return getFormattedPrice(amount);
 }
 
 export function getStatusNotificationHtml({ status, address, link }: ListingInfo): string {
@@ -148,14 +191,18 @@ export function getOpenHouseNotificationHtml({ openHouseDate, address, link }: L
         </div>
         <div class="content">
           <p>Hello,</p>
-          <p>The open house date of the following real estate listing has been updated:</p>
+          <p>The open house date of the following real estate listing has been ${openHouseDate ? 'updated' : 'cancelled'}:</p>
 
           <div class="listing-box">
             <div class="label"><strong>Address:</strong></div>
             <div>${address}</div>
-
+          ${
+            openHouseDate
+              ? `
             <div class="label" style="margin-top:15px;"><strong>Open House Date:</strong></div>
-            <div>${openHouseDate?.replace('|', '<br>')}</div>
+            <div>${openHouseDate.replace('|', '<br>')}</div>`
+              : ''
+          }
           </div>
 
           <div class="cta">
@@ -172,55 +219,4 @@ export function getOpenHouseNotificationHtml({ openHouseDate, address, link }: L
 
       </div>
     </div>`;
-}
-
-export function extractRedfinData(input: string): string {
-  const marker = '"text":"{}&&';
-  const startAfterMarker = '"\\u002Fstingray\\u002Fapi\\u002Fhome\\u002Fdetails\\u002FaboveTheFold":';
-
-  let foundSearchStart = false;
-  let foundMarker = false;
-
-  let depth = 0;
-  let startIdx;
-  let endIdx = -1;
-
-  const isAtIndexOf = (str: string, idx: number) => str === input.slice(idx, idx + str.length);
-
-  for (let i = 0; i < input.length; i++) {
-    if (!foundSearchStart) {
-      foundSearchStart = isAtIndexOf(startAfterMarker, i);
-      if (foundSearchStart) i = i + startAfterMarker.length;
-      else continue;
-    }
-    if (!foundMarker) {
-      foundMarker = isAtIndexOf(marker, i);
-      if (foundMarker) i = i + marker.length;
-      else continue;
-    }
-
-    const char = input[i];
-
-    if (char === '{') {
-      depth++;
-      if (!startIdx) startIdx = i;
-    } else if (char === '}') depth--;
-
-    if (depth === 0) {
-      endIdx = i;
-      break;
-    }
-  }
-
-  return input.slice(startIdx, endIdx + 1);
-}
-
-export function parseRedfinData(data: string): RedfinAddressInfo {
-  const unescaped = JSON.parse(`"${data}"`);
-  const redfinData: {
-    addressSectionInfo: RedfinAddressInfo;
-    mediaBrowserInfo: RedfinMediaInfo; // Currently unused
-  } = JSON.parse(unescaped).payload;
-
-  return redfinData.addressSectionInfo;
 }

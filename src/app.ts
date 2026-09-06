@@ -1,21 +1,23 @@
 import axios from 'axios';
 import packageInfo from '../package.json';
-import { AXIOS_CONFIG, INTERVAL, REDFIN_URL } from './constants/constants';
+import { AXIOS_CONFIG, INTERVAL, REDFIN_URL, SELECTORS } from './constants/constants';
 import { DbService } from './services/db.service';
 import { EmailService } from './services/email.service';
-import { AxiosData, ListingInfo, RedfinAddressInfo } from './constants/types';
+import { AxiosData, ListingInfo } from './constants/types';
 import {
-  extractRedfinData as extractRedfinDataString,
   getStatusNotificationHtml,
-  getStatusEnum,
+  getStatus,
   log,
-  parseRedfinData,
   getOpenHouseNotificationHtml,
   getOpenHouseDate,
-  getFormattedPrice,
   getPriceNotificationHtml,
+  getAbbreviatedPrice,
+  getAddress,
+  getPrice,
+  getContentHash,
 } from './constants/helpers';
 import { ConsoleType, ListingStatus } from './constants/enums';
+import * as cheerio from 'cheerio';
 
 class App {
   private readonly db: DbService;
@@ -37,34 +39,28 @@ class App {
       log(); // Heartbeat
     }, INTERVAL);
 
-    log(`Successfully initialized for address: ${this.cachedListingInfo?.address}`);
+    if (this.cachedListingInfo?.address) {
+      log(`Successfully initialized for address: ${this.cachedListingInfo.address}`);
+    }
   }
 
   private async checkListingInfo(): Promise<void> {
     const listingInfo = await this.fetchListingInfo();
     if (!listingInfo) return;
-    let saveListingInfo = false;
 
-    if (listingInfo.status !== this.cachedListingInfo?.status) {
-      saveListingInfo = true;
+    if (this.cachedListingInfo?.status && listingInfo.status !== this.cachedListingInfo.status) {
       this.notifyStatusChange(listingInfo);
     }
 
-    if (
-      listingInfo.price &&
-      this.cachedListingInfo?.price &&
-      listingInfo.price !== this.cachedListingInfo.price
-    ) {
-      saveListingInfo = true;
+    if (this.cachedListingInfo?.price && listingInfo.price !== this.cachedListingInfo.price) {
       this.notifyPriceChange(listingInfo, this.cachedListingInfo.price);
     }
 
-    if (listingInfo.openHouseDate && listingInfo.openHouseDate !== this.cachedListingInfo?.openHouseDate) {
-      saveListingInfo = true;
+    if (listingInfo.openHouseDate !== this.cachedListingInfo?.openHouseDate) {
       this.notifyOpenHouseChange(listingInfo);
     }
 
-    if (saveListingInfo) this.saveListingInfo(listingInfo);
+    this.saveListingInfo(listingInfo);
   }
 
   private saveListingInfo(listingInfo: ListingInfo): void {
@@ -81,7 +77,7 @@ class App {
   }
 
   private notifyPriceChange(listingInfo: ListingInfo, oldPrice: number): void {
-    const subject = `Listing Price Updated: ${getFormattedPrice(oldPrice, true)} → ${getFormattedPrice(listingInfo.price, true)}`;
+    const subject = `New Listing Price: ${getAbbreviatedPrice(oldPrice)} → ${getAbbreviatedPrice(listingInfo.price)}`;
     const body = getPriceNotificationHtml(listingInfo, oldPrice);
 
     log(subject);
@@ -89,7 +85,9 @@ class App {
   }
 
   private notifyOpenHouseChange(listingInfo: ListingInfo): void {
-    const subject = `New Open House: ${listingInfo.openHouseDate?.split('|')[0]}`;
+    const subject = listingInfo.openHouseDate
+      ? `New Open House: ${listingInfo.openHouseDate.split('|')[0]}`
+      : 'Open House Cancelled';
     const body = getOpenHouseNotificationHtml(listingInfo);
 
     log(subject);
@@ -101,20 +99,30 @@ class App {
     let price: number | undefined;
     let openHouseDate: string | undefined;
     let address: string | undefined = this.cachedListingInfo?.address;
+    let hash: number | undefined;
 
     try {
-      const { data: html }: AxiosData = await axios.get(this.url.href, AXIOS_CONFIG);
-      const rawApiData: string = extractRedfinDataString(html);
-      const redfinInfo: RedfinAddressInfo = parseRedfinData(rawApiData);
+      const { data: html, status: responseCode }: AxiosData = await axios.get(this.url.href, AXIOS_CONFIG);
+      if (responseCode !== 200) throw new Error(`Redfin API responded with code ${responseCode}`);
 
-      status = getStatusEnum(redfinInfo.status.displayValue);
-      price = redfinInfo.latestPriceInfo.amount || redfinInfo.priceInfo.amount;
-      openHouseDate = getOpenHouseDate(html);
+      const $ = cheerio.load(html);
+      const [mainSection, openHouseSection] = [SELECTORS.mainSection, SELECTORS.openHouseSection].map(
+        (selector) => $(selector).first(),
+      );
+      hash = getContentHash([mainSection, openHouseSection]);
 
-      if (!address) {
-        const { streetAddress, city, state, zip } = redfinInfo;
-        if (streetAddress.assembledAddress)
-          address = `${streetAddress.assembledAddress}, ${city}, ${state} ${zip}`;
+      if (hash === this.cachedListingInfo?.hash) {
+        return this.cachedListingInfo;
+      }
+
+      if (mainSection) {
+        status = getStatus(mainSection);
+        price = getPrice(mainSection);
+        if (!address) address = getAddress(mainSection);
+      }
+
+      if (openHouseSection) {
+        openHouseDate = getOpenHouseDate(openHouseSection);
       }
     } catch (e: any) {
       log(`Error fetching Redfin listing info from ${this.url.href}: ${e?.message}`, ConsoleType.Error);
@@ -127,9 +135,10 @@ class App {
     return {
       status: status || this.cachedListingInfo?.status,
       price: price || this.cachedListingInfo?.price,
-      address,
-      link: this.url.href,
       openHouseDate: openHouseDate || this.cachedListingInfo?.openHouseDate,
+      address,
+      hash,
+      link: this.url.href,
     } as ListingInfo;
   }
 }

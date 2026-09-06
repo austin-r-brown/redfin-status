@@ -1,10 +1,11 @@
 export enum ListingStatus {
-  Active = 'For Sale',
-  PendingSale = 'Pending',
-  ClosedSale = 'Sold',
-  Sold = 'For Rent',
-  ComingSoon = 'Coming Soon',
-  ActiveUnderContract = 'Contingent',
+  Forsale = 'For Sale',
+  Pending = 'Pending',
+  Sold = 'Sold',
+  Forrent = 'For Rent',
+  Comingsoon = 'Coming Soon',
+  Contingent = 'Contingent',
+  Offmarket = 'Off Market',
 }
 
 export enum ConsoleType {

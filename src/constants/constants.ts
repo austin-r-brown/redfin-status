@@ -14,6 +14,17 @@ export const INTERVAL: number = Math.min(
 
 export const REDFIN_URL: string = process.env.REDFIN_URL?.trim() || '';
 
+export const SELECTORS = {
+  mainSection: '.bp-Section--content div',
+  openHouseSection: '.open-house-section',
+  statusMain: '.ListingStatusBannerSection',
+  statusRental: '.status-banner',
+  address: '.street-address',
+  price: '.statsValue.price',
+  openHouseDate: '.oh-date',
+  openHouseTime: '.oh-time',
+} as const;
+
 export const AXIOS_CONFIG = {
   headers: {
     'User-Agent':
@@ -22,4 +33,4 @@ export const AXIOS_CONFIG = {
     'Accept-Language': 'en-US,en;q=0.9',
     Connection: 'keep-alive',
   },
-};
+} as const;
