@@ -61,7 +61,7 @@ export function getOpenHouseDate(section: Cheerio<any>): string | undefined {
   const openHouseDate = ['.oh-date', '.oh-time']
     .map((selector) => section.find(selector)?.text()?.trim())
     .filter(Boolean)
-    .join('|');
+    .join('<br>');
 
   if (openHouseDate) return openHouseDate;
 }
@@ -186,9 +186,8 @@ export function getOpenHouseNotificationHtml({ openHouseDate, address, link }: L
             <div>${address}</div>
           ${
             openHouseDate
-              ? `
-            <div class="label" style="margin-top:15px;"><strong>Open House Date:</strong></div>
-            <div>${openHouseDate.replace('|', '<br>')}</div>`
+              ? `<div class="label" style="margin-top:15px;"><strong>Open House Date:</strong></div>
+              <div>${openHouseDate}</div>`
               : ''
           }
           </div>

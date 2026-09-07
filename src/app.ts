@@ -3,7 +3,7 @@ import packageInfo from '../package.json';
 import { AXIOS_CONFIG, INTERVAL, REDFIN_URL, SELECTORS } from './constants/constants';
 import { DbService } from './services/db.service';
 import { EmailService } from './services/email.service';
-import { AxiosData, ListingInfo } from './constants/types';
+import { ListingInfo } from './constants/types';
 import {
   getStatusNotificationHtml,
   getStatus,
@@ -92,7 +92,7 @@ class App {
 
   private notifyOpenHouseChange(listingInfo: ListingInfo): void {
     const subject = listingInfo.openHouseDate
-      ? `New Open House: ${listingInfo.openHouseDate.split('|')[0]}`
+      ? `New Open House: ${listingInfo.openHouseDate.split('<br>')[0]}`
       : 'Open House Cancelled';
     const body = getOpenHouseNotificationHtml(listingInfo);
 
@@ -100,7 +100,7 @@ class App {
     this.email.send(subject, [body]);
   }
 
-  private async fetchListingInfo(): Promise<ListingInfo> {
+  private async fetchListingInfo(): Promise<ListingInfo | null> {
     let status: ListingStatus | undefined;
     let price: number | undefined;
     let openHouseDate: string | undefined;
@@ -108,7 +108,7 @@ class App {
     let hash: number | undefined;
 
     try {
-      const { data: html, status: responseCode }: AxiosData = await axios.get(this.url.href, AXIOS_CONFIG);
+      const { data: html, status: responseCode } = await axios.get(this.url.href, AXIOS_CONFIG);
       if (responseCode !== 200) throw new Error(`Redfin API responded with code ${responseCode}`);
 
       const $ = cheerio.load(html);
@@ -118,12 +118,12 @@ class App {
       hash = getContentHash([mainSection, openHouseSection]);
 
       if (hash === this.cachedListingInfo?.hash) {
-        return this.cachedListingInfo;
+        return null;
       }
 
       if (mainSection) {
         status = getStatus(mainSection);
-        // Ignore price changes if the listing is Off Market
+        // Price shown for Off Market listings is Redfin Estimate - not a sale price
         price = status !== ListingStatus.OffMarket ? getPrice(mainSection) : this.cachedListingInfo?.price;
         if (!address) address = getAddress(mainSection);
       }
@@ -142,7 +142,7 @@ class App {
     return {
       status: status || this.cachedListingInfo?.status,
       price: price || this.cachedListingInfo?.price,
-      openHouseDate: openHouseDate || this.cachedListingInfo?.openHouseDate,
+      openHouseDate,
       address,
       hash,
       link: this.url.href,
