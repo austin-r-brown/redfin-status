@@ -133,6 +133,7 @@ class App {
       }
     } catch (e: any) {
       log(`Error fetching Redfin listing info from ${this.url.href}: ${e?.message}`, ConsoleType.Error);
+      return null;
     }
 
     if (!status) log('Unable to find Status', ConsoleType.Error);
