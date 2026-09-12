@@ -9,6 +9,8 @@ const FILE_EXTENSION = 'json';
 
 /** Service for saving and restoring persisted data */
 export class DbService {
+  public listingInfo: ListingInfo | null;
+
   private readonly filepath: string;
   private readonly filename: string;
 
@@ -16,6 +18,8 @@ export class DbService {
     this.filename = this.generateFilename(this.id);
     this.filepath = path.join(DB_ROOT_DIR, this.filename);
     this.createFolders();
+
+    this.listingInfo = this.load();
   }
 
   public async save(listingInfo: ListingInfo): Promise<void> {
@@ -28,6 +32,8 @@ export class DbService {
         log(`Saved DB file: ${this.filename}`);
       }
     });
+
+    this.listingInfo = listingInfo;
   }
 
   public load(): ListingInfo | null {

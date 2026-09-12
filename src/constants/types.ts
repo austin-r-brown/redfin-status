@@ -12,7 +12,6 @@ export type ListingInfo = {
   status: ListingStatus;
   price: number;
   address: string;
-  link: string;
   openHouseDate?: string;
   hash: number;
 };
