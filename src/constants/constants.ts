@@ -46,5 +46,6 @@ export const AXIOS_CONFIG = {
     Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
     'Accept-Language': 'en-US,en;q=0.9',
     Connection: 'keep-alive',
+    Cookie: 'aws-waf-token=a015dda6-cab5-47d3-9dcd-472951a25bcb:EwoA6BZtP2OCAwAA:48nPb6djlHQkMM8XB+ApcPSpKlLY8gQvNIr4RfuHIvnDl6gBREvT1yJfUhBNOPorBcY29250xdzW1GgXXZpMHk1kynnT4DXcCwGbGbx2VoXHxdPa5h1IDo/C7I7yq0R8QiMh6PllwidzlQlESX9L9kuEShuPoR6+q3WPGtZIUDFIVjA8u+sqbct7ATq/p9AmCBPJLAKUDKAZLd5QQfTZVcuQo3+Tw0nn7fqJ/I1plQ0vGyOZreOxHQxMIaBHDrACmMbFod/9h9AURV3WLClnZnChA6SC/sHT'
   },
 } as const;
